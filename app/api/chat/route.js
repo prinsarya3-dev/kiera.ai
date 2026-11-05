@@ -1,28 +1,31 @@
 
-export async function POST(request) {
+export async function POST(req) {
   try {
-    const { messages } = await request.json();
+    const { messages } = await req.json();
 
     const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return Response.json(
+        { error: "GEMINI_API_KEY missing in Vercel" },
+        { status: 500 }
+      );
+    }
 
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey,
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          system_instruction: {
+          systemInstruction: {
             parts: [{
-              text: `You are Kiera, an intelligent personal AI
-assistant created by Prins.
-If someone asks who created you, say Prins.
-Speak naturally in Hindi, English and other languages.
-Be friendly, intelligent, caring and helpful.`
+              text: "Your name is Kiera AI. You were created by Prins. Be friendly, intelligent, helpful and reply in the same language the user uses."
             }]
           },
-          contents: messages.map(m => ({
+          contents: messages.map((m) => ({
             role: m.role === "assistant" ? "model" : "user",
             parts: [{ text: m.content }]
           }))
@@ -33,24 +36,21 @@ Be friendly, intelligent, caring and helpful.`
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("Gemini error:", data);
       return Response.json(
-        { error: "AI service error. Please try again." },
-        { status: 500 }
+        { error: data.error?.message || "Gemini API error" },
+        { status: response.status }
       );
     }
 
-    return Response.json({
-      reply: data.candidates?.[0]?.content?.parts?.[0]?.text
-        || "Sorry Prins, please try again."
-    });
+    const reply =
+      data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    return Response.json({ reply: reply || "Kiera ko jawab nahi mila." });
 
   } catch (error) {
-    console.error(error);
     return Response.json(
-      { error: "Kiera could not respond." },
+      { error: error.message || "Server error" },
       { status: 500 }
     );
   }
 }
-
